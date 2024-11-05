@@ -3,7 +3,7 @@ import time
 from argparse import ArgumentParser
 from memmove.torch_op import permute_tokens as torch_move
 from memmove.triton_op import permute_tokens as triton_move
-
+from memmove.cpp_op import permute_tokens as cpp_move
 class Benchmark:
     
     def __init__(self, name, op, warmup_iter=5, run_iter=10):
@@ -61,9 +61,11 @@ def main():
     
     torchop = Benchmark("torch", torch_move)
     tritonop = Benchmark("triton", triton_move)
+    cppop = Benchmark("cpp", cpp_move)
     
     torchop(inputs, mappings)
     tritonop(inputs, mappings)
+    cppop(inputs, mappings)
         
     
 
