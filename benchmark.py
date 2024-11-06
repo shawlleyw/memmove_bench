@@ -21,14 +21,22 @@ class Benchmark:
         torch.cuda.synchronize()
         start = time.time()
         
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        
+        start_event.record()
+        
         for i in range(self.runs):
             self.op(*args)
-            
+        
+        end_event.record()
+        
         torch.cuda.synchronize()
         end = time.time()
+        cuda_elapse = start_event.elapsed_time(end_event) / self.runs * 1000
         
-        elapse = (end - start) * (10 ** 6)
-        print(f"benchmark {self.name} takes: {elapse:.2f} us")
+        elapse = (end - start) * (10 ** 6) / self.runs
+        print(f"benchmark {self.name} takes: {elapse:.2f} us, cuda elpase: {cuda_elapse:.2f} us")
         
     def __call__(self, *args):
         self.run(*args)
@@ -40,6 +48,7 @@ def get_args():
     parser.add_argument("-d", "--dim", type=int, default=4096)
     parser.add_argument("-b", "--batch", type=int, default=64)
     parser.add_argument("-e", "--experts", type=int, default=None)
+    parser.add_argument("-p", "--profile", type=str, default=None)
     
     args = parser.parse_args()
     return args
@@ -55,6 +64,13 @@ def main():
         # generate expert id (bin index)
         pass
     
+    if args.profile:
+        profiler = torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+            with_stack=True, on_trace_ready=torch.profiler.tensorboard_trace_handler(dir_name="torch_profile", worker_name=args.profile),
+        )
+        profiler.start()
+    
     
     inputs = torch.randn((args.batch, args.dim), dtype=torch.bfloat16, device="cuda:0")
     print(f"Input shape: {inputs.shape}, dtype={inputs.dtype}")
@@ -66,9 +82,10 @@ def main():
     torchop(inputs, mappings)
     tritonop(inputs, mappings)
     cppop(inputs, mappings)
-        
     
-
+    if args.profile:
+        profiler.stop()
+        
 
 if __name__ == '__main__':
     main()

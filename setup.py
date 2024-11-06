@@ -2,6 +2,7 @@ from setuptools import setup, Extension, find_packages
 import pybind11
 import torch
 from pybind11.setup_helpers import build_ext, Pybind11Extension
+from torch.utils import cpp_extension
 
 TORCH_HOME = torch.__path__[0]
 TORCH_LIB = f"{TORCH_HOME}/lib"
@@ -10,7 +11,7 @@ TORCH_INCLUDES = [f"{TORCH_HOME}/include/torch/csrc/api/include", f"{TORCH_HOME}
 print(f"torch at {TORCH_HOME}")
 
 exts = [
-    Pybind11Extension(
+    cpp_extension.CppExtension(
         "memmove_c",
         ["csrc/bindings.cc", "csrc/cpp_move.cc"],
         include_dirs=[
@@ -34,6 +35,6 @@ setup(
     name="memmove",
     version="0.0",
     ext_modules=exts,
-    cmdclass={"build_ext": build_ext},
+    cmdclass={"build_ext": cpp_extension.BuildExtension},
     packages=find_packages(".")
 )

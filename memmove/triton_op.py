@@ -3,25 +3,25 @@ import torch
 import triton
 import triton.language as tl
 
-@triton.autotune(configs=[
-    triton.Config(kwargs={"BLOCK_SIZE": 64}, num_warps=2),
+# @triton.autotune(configs=[
+#     triton.Config(kwargs={"BLOCK_SIZE": 64}, num_warps=2),
     
-    triton.Config(kwargs={"BLOCK_SIZE": 128}, num_warps=2),
-    triton.Config(kwargs={"BLOCK_SIZE": 128}, num_warps=4),
+#     triton.Config(kwargs={"BLOCK_SIZE": 128}, num_warps=2),
+#     triton.Config(kwargs={"BLOCK_SIZE": 128}, num_warps=4),
     
-    triton.Config(kwargs={"BLOCK_SIZE": 256}, num_warps=4),
-    triton.Config(kwargs={"BLOCK_SIZE": 256}, num_warps=8),
+#     triton.Config(kwargs={"BLOCK_SIZE": 256}, num_warps=4),
+#     triton.Config(kwargs={"BLOCK_SIZE": 256}, num_warps=8),
     
-    triton.Config(kwargs={"BLOCK_SIZE": 512}, num_warps=4),
-    triton.Config(kwargs={"BLOCK_SIZE": 512}, num_warps=8),
-    triton.Config(kwargs={"BLOCK_SIZE": 512}, num_warps=16),
+#     triton.Config(kwargs={"BLOCK_SIZE": 512}, num_warps=4),
+#     triton.Config(kwargs={"BLOCK_SIZE": 512}, num_warps=8),
+#     triton.Config(kwargs={"BLOCK_SIZE": 512}, num_warps=16),
     
-    triton.Config(kwargs={"BLOCK_SIZE": 1024}, num_warps=4),
-    triton.Config(kwargs={"BLOCK_SIZE": 1024}, num_warps=8),
-    triton.Config(kwargs={"BLOCK_SIZE": 1024}, num_warps=16),
-    triton.Config(kwargs={"BLOCK_SIZE": 1024}, num_warps=32),
-], key=["hidden_size"],
-)
+#     triton.Config(kwargs={"BLOCK_SIZE": 1024}, num_warps=4),
+#     triton.Config(kwargs={"BLOCK_SIZE": 1024}, num_warps=8),
+#     triton.Config(kwargs={"BLOCK_SIZE": 1024}, num_warps=16),
+#     triton.Config(kwargs={"BLOCK_SIZE": 1024}, num_warps=32),
+# ], key=["hidden_size"],
+# )
 @triton.jit
 def _permute_tokens_kernel(
     out_ptr, # buffer for permuted tokens 
@@ -76,6 +76,6 @@ def permute_tokens(tokens: torch.Tensor,
         tokens, 
         mappings.cuda(),
         hiddens_size,
-        # BLOCK_SIZE=128
+        BLOCK_SIZE=1024
     )
     return permuted_tokens

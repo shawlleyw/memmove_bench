@@ -4,6 +4,7 @@
 #include <iostream>
 #include <assert.h>
 #include <cstring>
+#include <string>
 
 #include "cpp_move.hh"
 
@@ -22,8 +23,9 @@ torch::Tensor permute_tokens_cpp(torch::Tensor tokens, torch::Tensor mappings) {
     const int elem_size = sizeof(tokens.dtype());
     const int token_size = elem_size * hiddens;
 
-    auto mappings_acc = mappings.accessor<int,1>();
+    auto mappings_acc = mappings.accessor<long,1>();
 
+    #pragma omp parallel for
     for (int i = 0; i < batch; i++) {
         void* src = (void*)tokens_cpu.data_ptr() + i * token_size;
         void* dest = (void*)moved_tokens.data_ptr() + mappings_acc[i] * token_size;
