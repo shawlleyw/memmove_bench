@@ -17,21 +17,21 @@ __global__ void permute_tokens_kernel(T *d_out, T *d_in, long *mappings, const i
     int num_warps = blockDim.x / 32;
 
     int tid = threadIdx.x;
-    const int WARPSIZE = 32;
+    constexpr int WARPSIZE = 32;
     int wid = tid / WARPSIZE;
 
     int p = mappings[token_id];
-    T *dest = d_out + p * hidden_size;
 
     int task_per_warp = CHUNK_SIZE / num_warps;
 
-
     int base = chunk_id * CHUNK_SIZE + wid * task_per_warp;
 
-    half2 *d_in_half2 = (half2 *)d_in;
-    half2 *dest_half2 = (half2 *)dest;
+    // TODO: deal with fp16 and bf16
+    half2 *d_in_half2 = (half2 *)(d_in + token_id * hidden_size);
+    half2 *dest_half2 = (half2 *)(d_out + p * hidden_size);
 
     task_per_warp /= 2;
+    base /= 2;
 
     #pragma unroll
     for (int i = tid; i < task_per_warp; i += WARPSIZE) {
@@ -58,6 +58,7 @@ void _permute_tokens_cuda(T *dest, T *src, long *mappings, int num_tokens, int h
 torch::Tensor permute_tokens_cuda(torch::Tensor tokens, torch::Tensor mappings) {
     assert(tokens.dim() == 2);
     assert(mappings.dim() == 1);
+    assert(tokens.size(0) == mappings.size(0));
 
     int num_tokens = tokens.size(0);
     int hidden_size = tokens.size(1);

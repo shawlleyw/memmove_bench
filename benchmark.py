@@ -77,14 +77,15 @@ def main():
     print(f"Input shape: {inputs.shape}, dtype={inputs.dtype}")
     
     torchop = Benchmark("torch", torch_move)
+    cudaop = Benchmark("cuda", cuda_move)
     tritonop = Benchmark("triton", triton_move)
     cppop = Benchmark("cpp", cpp_move)
-    cudaop = Benchmark("cuda", cuda_move)
     
     torchop(inputs, mappings)
+    cudaop(inputs, mappings)
     tritonop(inputs, mappings)
     cppop(inputs, mappings)
-    cudaop(inputs, mappings)
+    
     
     if args.profile:
         profiler.stop()
