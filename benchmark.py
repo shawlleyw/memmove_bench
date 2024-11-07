@@ -73,7 +73,7 @@ def main():
         profiler.start()
     
     
-    inputs = torch.randn((args.batch, args.dim), dtype=torch.bfloat16, device="cuda:0")
+    inputs = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cuda:0")
     print(f"Input shape: {inputs.shape}, dtype={inputs.dtype}")
     
     torchop = Benchmark("torch", torch_move)
