@@ -30,7 +30,7 @@ void _permute_tokens_cuda(T *dest, T *src, long *mappings, int num_tokens, int h
 
     int chunk_size = 256;
     if (num_tokens > 64) {
-        int chunk_size = 1024;
+        chunk_size = 1024;
     }
     int num_chunks = hidden_size / chunk_size;
     const int num_threads = 128;
