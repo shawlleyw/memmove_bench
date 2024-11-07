@@ -13,18 +13,17 @@ print(f"torch at {TORCH_HOME}")
 exts = [
     cpp_extension.CppExtension(
         "memmove_c",
-        ["csrc/bindings.cc", "csrc/cpp_move.cc"],
+        ["csrc/bindings.cc", "csrc/cpp_move.cc", "csrc/cuda_move.cu"],
         include_dirs=[
             pybind11.get_include(),
             *TORCH_INCLUDES,
             "csrc",
         ],
+        extra_compile_args=[
+            "-O2",
+        ],
         library_dirs=[
             TORCH_LIB,
-        ],
-        extra_compile_args=["-fPIC", "-ltorch"],
-        extra_link_args=[
-            '-Wl,-rpath,' + TORCH_LIB, "-ltorch"
         ],
         libraries=['torch', 'c10', 'torch_cpu'],
         language="c++",
