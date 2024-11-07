@@ -10,7 +10,7 @@
 #include "cuda_move.h"
 
 template <class T>
-__global__ void permute_tokens_kernel(T *d_out, T *d_in, long *mappings, int hidden_size, int chunk_size) {
+__global__ void permute_tokens_kernel(T *d_out, T *d_in, long *mappings, const int hidden_size, const int chunk_size) {
     int token_id = blockIdx.x;
     int chunk_id = blockIdx.y;
 
@@ -19,9 +19,9 @@ __global__ void permute_tokens_kernel(T *d_out, T *d_in, long *mappings, int hid
     int p = mappings[token_id];
     T *dest = d_out + p * hidden_size;
 
-    #pragma unroll
-    for (int i = 0; i < chunk_size; i += blockDim.x) {
-        dest[chunk_id * chunk_size + tid + i] = d_in[chunk_id * chunk_size + tid + i];
+    #pragma unroll 4
+    for (int i = tid; i < chunk_size; i += blockDim.x) {
+        dest[chunk_id * chunk_size + i] = d_in[chunk_id * chunk_size + i];
     }
 }
 
