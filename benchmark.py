@@ -27,8 +27,10 @@ class Benchmark:
         
         start_event.record()
         
+        results = []
+        
         for i in range(self.runs):
-            self.op(*args)
+            results.append(self.op(*args))
         
         end_event.record()
         
@@ -39,8 +41,10 @@ class Benchmark:
         elapse = (end - start) * (10 ** 6) / self.runs
         print(f"benchmark {self.name} takes: {elapse:.2f} us, cuda elpase: {cuda_elapse:.2f} us")
         
+        return results[0]
+        
     def __call__(self, *args):
-        self.run(*args)
+        return self.run(*args)
         
 
 def get_args():
@@ -50,6 +54,7 @@ def get_args():
     parser.add_argument("-b", "--batch", type=int, default=64)
     parser.add_argument("-e", "--experts", type=int, default=None)
     parser.add_argument("-p", "--profile", type=str, default=None)
+    parser.add_argument("-m", "--memory-track", action="store_true")
     
     args = parser.parse_args()
     return args
@@ -72,20 +77,25 @@ def main():
         )
         profiler.start()
     
-    
     inputs = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cuda:0")
     print(f"Input shape: {inputs.shape}, dtype={inputs.dtype}")
+    
+    if args.memory_track:
+        torch.cuda.memory._record_memory_history()
     
     torchop = Benchmark("torch", torch_move)
     cudaop = Benchmark("cuda", cuda_move)
     tritonop = Benchmark("triton", triton_move)
     cppop = Benchmark("cpp", cpp_move)
     
-    torchop(inputs, mappings)
-    cudaop(inputs, mappings)
-    tritonop(inputs, mappings)
-    cppop(inputs, mappings)
+    # NOTE: the torch op is a reverse operation of the other three
+    torch_res = torchop(inputs, mappings)
+    cuda_res = cudaop(inputs, mappings)
+    triton_res = tritonop(inputs, mappings)
+    cpp_res = cppop(inputs, mappings)
     
+    if args.memory_track:
+        torch.cuda.memory._dump_snapshot("mem_snapshot.pickle")
     
     if args.profile:
         profiler.stop()
