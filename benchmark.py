@@ -1,7 +1,7 @@
 import torch
 import time
 from argparse import ArgumentParser
-from memmove.torch_op import permute_tokens as torch_move
+from memmove.torch_op import permute_tokens as torch_move, gpu_to_cpu, cpu_to_gpu
 from memmove.triton_op import permute_tokens as triton_move
 from memmove.cpp_op import permute_tokens as cpp_move
 from memmove.cuda_op import permute_tokens as cuda_move
@@ -94,6 +94,16 @@ def main():
     triton_res = tritonop(inputs, mappings)
     cpp_res = cppop(inputs, mappings)
     
+    
+    cpu_tensor = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cpu")
+    gpu_tensor = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cuda")
+    
+    D2H = Benchmark("D2H", gpu_to_cpu)
+    H2D = Benchmark("H2D", cpu_to_gpu)
+    
+    D2H(gpu_tensor)
+    H2D(cpu_tensor)
+        
     if args.memory_track:
         torch.cuda.memory._dump_snapshot("mem_snapshot.pickle")
     
