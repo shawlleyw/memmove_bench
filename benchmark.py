@@ -38,8 +38,10 @@ class Benchmark:
         end = time.time()
         cuda_elapse = start_event.elapsed_time(end_event) / self.runs * 1000
         
+        data_size = results[0].element_size() * results[0].numel()
+        
         elapse = (end - start) * (10 ** 6) / self.runs
-        print(f"benchmark {self.name} takes: {elapse:.2f} us, cuda elpase: {cuda_elapse:.2f} us")
+        print(f"benchmark {self.name} takes: {elapse:.1f} us, cuda elpase: {cuda_elapse:.1f} us, bw : {8 * data_size / elapse / (10 ** 3):.1f} gbps")
         
         return results[0]
         
