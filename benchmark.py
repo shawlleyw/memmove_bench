@@ -2,7 +2,7 @@ import torch
 import time
 from argparse import ArgumentParser
 from memmove.torch_op import permute_tokens as torch_move, gpu_to_cpu, cpu_to_gpu
-from memmove.triton_op import permute_tokens as triton_move
+from memmove.triton_op import permute_tokens as triton_move, get_mappings_from_exp_ids
 from memmove.cpp_op import permute_tokens as cpp_move
 from memmove.cuda_op import permute_tokens as cuda_move
 class Benchmark:
@@ -70,8 +70,9 @@ def main():
         mappings = torch.randperm(args.batch, dtype=torch.int64, device="cuda:0")
     else:
         # generate expert id (bin index)
-        pass
-    
+        exp_ids = torch.randint(0, args.experts, (args.batch,), dtype=torch.int64, device="cuda:0")
+        mappings, _ = get_mappings_from_exp_ids(exp_ids, args.experts)
+        
     if args.profile:
         profiler = torch.profiler.profile(
             activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
@@ -95,7 +96,6 @@ def main():
     cuda_res = cudaop(inputs, mappings)
     triton_res = tritonop(inputs, mappings)
     cpp_res = cppop(inputs, mappings)
-    
     
     cpu_tensor = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cpu")
     gpu_tensor = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cuda")

@@ -52,7 +52,7 @@ def get_mappings_from_exp_ids(exp_ids: torch.Tensor, num_experts: int):
     exp_cnt = torch.bincount(exp_ids, minlength=num_experts)
     exp_cumsum = torch.cumsum(exp_cnt, dim=0)
     
-    mappings = torch.empty(exp_ids.shape[0], device="cpu", dtype=torch.int32)  
+    mappings = torch.empty(exp_ids.shape[0], device="cpu", dtype=torch.int64)  
     
     for i, id in enumerate(exp_ids):
         exp_cumsum[id] -= 1
