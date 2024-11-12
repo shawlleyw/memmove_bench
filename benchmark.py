@@ -83,6 +83,7 @@ def mappings_perf(args):
 
 @torch.inference_mode
 def main():
+    torch.random.manual_seed(42)
     args = get_args()
     
     if not args.experts:
@@ -111,11 +112,23 @@ def main():
     tritonop = Benchmark("triton", triton_move)
     cppop = Benchmark("cpp", cpp_move)
     
+    def get_torch_mappings():
+        mappings_list = mappings.tolist()
+        torch_mappings = [0] * len(mappings_list)
+        
+        for i, id in enumerate(mappings_list):
+            torch_mappings[id] = i
+        return torch.tensor(torch_mappings, dtype=mappings.dtype, device=mappings.device)
+    
     # NOTE: the torch op is a reverse operation of the other three
-    torch_res = torchop(inputs, mappings)
+    torch_res = torchop(inputs, get_torch_mappings())
     cuda_res = cudaop(inputs, mappings)
     triton_res = tritonop(inputs, mappings)
     cpp_res = cppop(inputs, mappings)
+    
+    assert torch.allclose(torch_res, triton_res)
+    assert torch.allclose(torch_res, cuda_res)
+    assert torch.allclose(torch_res, cpp_res)
     
     cpu_tensor = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cpu")
     gpu_tensor = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cuda")
@@ -126,7 +139,8 @@ def main():
     D2H(gpu_tensor)
     H2D(cpu_tensor)
     
-    mappings_perf(args)
+    if args.experts:
+        mappings_perf(args)
         
     if args.memory_track:
         torch.cuda.memory._dump_snapshot("mem_snapshot.pickle")

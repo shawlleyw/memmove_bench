@@ -12,47 +12,56 @@
 
 template <class T, int CHUNK_SIZE>
 __global__ void permute_tokens_kernel(T *d_out, T *d_in, long *mappings, const int hidden_size) {
+    constexpr int WARPSIZE = 32;
+
     int token_id = blockIdx.x;
     int chunk_id = blockIdx.y;
-    int num_warps = blockDim.x / 32;
+    int num_warps = blockDim.x / WARPSIZE;
 
     int tid = threadIdx.x;
-    constexpr int WARPSIZE = 32;
+    int id_in_warp = tid % WARPSIZE;
     int wid = tid / WARPSIZE;
 
     int p = mappings[token_id];
+    if (p == token_id) {
+        return;
+    }
 
-    int task_per_warp = CHUNK_SIZE / num_warps;
-
-    int base = chunk_id * CHUNK_SIZE + wid * task_per_warp;
+    int block_base = chunk_id * CHUNK_SIZE;
 
     // TODO: deal with fp16 and bf16
-    half2 *d_in_half2 = (half2 *)(d_in + token_id * hidden_size);
-    half2 *dest_half2 = (half2 *)(d_out + p * hidden_size);
+    half2 *d_in_half2 = (half2 *)(d_in + token_id * hidden_size + block_base);
+    half2 *dest_half2 = (half2 *)(d_out + p * hidden_size + block_base);
 
-    task_per_warp /= 2;
-    base /= 2;
+    int task_per_warp = CHUNK_SIZE / num_warps / 2;
+    int warp_base = wid * task_per_warp;
 
     #pragma unroll
-    for (int i = tid; i < task_per_warp; i += WARPSIZE) {
-        dest_half2[base + i] = d_in_half2[base + i];
+    for (int i = id_in_warp; i < task_per_warp; i += WARPSIZE) {
+        dest_half2[warp_base + i] = d_in_half2[warp_base + i];
     }
 }
 
+#define LAUNCH_KERNEL_(SIZE) \
+do { \
+    constexpr int chunk_size = (SIZE); \
+    dim3 grid(num_tokens, hidden_size / chunk_size, 1); \
+    permute_tokens_kernel<T, chunk_size><<<grid, block>>>(dest, src, mappings, hidden_size); \
+} while(0)
+    
 template <class T>
 void _permute_tokens_cuda(T *dest, T *src, long *mappings, int num_tokens, int hidden_size) {
-
-    constexpr int chunk_size = 1024;
-    // if (num_tokens > 64) {
-    //     chunk_size = 1024;
-    // }
-    int num_chunks = hidden_size / chunk_size;
-    const int num_threads = 128;
-
-    dim3 grid(num_tokens, num_chunks, 1);
+    assert(hidden_size >= 2048 && hidden_size % 2048 == 0);
+    constexpr int num_threads = 128;
     dim3 block(num_threads, 1, 1);
 
-    permute_tokens_kernel<T, chunk_size><<<grid, block>>>(dest, src, mappings, hidden_size);
+    if (num_tokens <= 128) {
+        LAUNCH_KERNEL_(512);
+    } else if (num_tokens <= 256) {
+        LAUNCH_KERNEL_(1024);
+    } else {
+        LAUNCH_KERNEL_(2048);
+    }
 }
 
 torch::Tensor permute_tokens_cuda(torch::Tensor tokens, torch::Tensor mappings) {
