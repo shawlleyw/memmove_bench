@@ -2,6 +2,7 @@ import torch
 
 import triton
 import triton.language as tl
+import numpy as np
 
 # @triton.autotune(configs=[
 #     triton.Config(kwargs={"BLOCK_SIZE": 64}, num_warps=2),
@@ -59,6 +60,74 @@ def get_mappings_from_exp_ids(exp_ids: torch.Tensor, num_experts: int):
         mappings[i] = exp_cumsum[id]
         
     return mappings, exp_cnt
+
+def get_mappings_from_exp_ids_cuda(exp_ids: torch.Tensor, num_experts: int):
+    assert len(exp_ids.shape) == 1 # [num_tokens]
+    
+    # exp_ids = exp_ids.to("cpu")
+    exp_cnt = torch.bincount(exp_ids, minlength=num_experts)
+    exp_cumsum = torch.cumsum(exp_cnt, dim=0)
+    
+    exp_cumsum = exp_cumsum.cpu()
+    mappings = torch.empty(exp_ids.shape[0], device="cpu", dtype=torch.int64)  
+    
+    for i, id in enumerate(exp_ids):
+        exp_cumsum[id] -= 1
+        mappings[i] = exp_cumsum[id]
+        
+    return mappings, exp_cnt
+
+def get_mappings_from_exp_ids_py(exp_ids: torch.Tensor, num_experts: int):
+    assert len(exp_ids.shape) == 1 # [num_tokens]
+    
+    exp_ids = exp_ids.view(-1).tolist()
+    
+    exp_cnt = [0] * num_experts
+    exp_cumsum = [0] * num_experts
+    
+    for id in exp_ids:
+        exp_cnt[id] += 1
+        
+    exp_cumsum[0] = exp_cnt[0]
+    for i in range(1, num_experts):
+        exp_cumsum[i] = exp_cumsum[i-1] + exp_cnt[i]
+    # exp_cnt = torch.bincount(exp_ids, minlength=num_experts)
+    # exp_cumsum = torch.cumsum(exp_cnt, dim=0)
+    
+    # mappings = torch.empty(exp_ids.shape[0], device="cpu", dtype=torch.int64)  
+    mappings = [0] * len(exp_ids)
+    
+    for i, id in enumerate(exp_ids):
+        exp_cumsum[id] -= 1
+        mappings[i] = exp_cumsum[id]
+        
+    return torch.LongTensor(mappings), exp_cnt
+
+def get_mappings_from_exp_ids_numpy(exp_ids: torch.Tensor, num_experts: int):
+    assert len(exp_ids.shape) == 1 # [num_tokens]
+    
+    exp_ids = exp_ids.view(-1).cpu().numpy()
+    
+    exp_cnt = np.zeros(num_experts, dtype=np.int32)
+    exp_cumsum = np.zeros(num_experts, dtype=np.int32)
+    
+    for id in exp_ids:
+        exp_cnt[id] += 1
+        
+    exp_cumsum[0] = exp_cnt[0]
+    for i in range(1, num_experts):
+        exp_cumsum[i] = exp_cumsum[i-1] + exp_cnt[i]
+    # exp_cnt = torch.bincount(exp_ids, minlength=num_experts)
+    # exp_cumsum = torch.cumsum(exp_cnt, dim=0)
+    
+    # mappings = torch.empty(exp_ids.shape[0], device="cpu", dtype=torch.int64)  
+    mappings = np.zeros(exp_ids.shape[0], dtype=np.int64)
+    
+    for i, id in enumerate(exp_ids):
+        exp_cumsum[id] -= 1
+        mappings[i] = exp_cumsum[id]
+        
+    return torch.from_numpy(mappings), exp_cnt
 
 def permute_tokens(tokens: torch.Tensor, 
                    mappings: torch.Tensor) -> torch.Tensor:

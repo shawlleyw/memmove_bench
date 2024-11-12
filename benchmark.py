@@ -2,9 +2,16 @@ import torch
 import time
 from argparse import ArgumentParser
 from memmove.torch_op import permute_tokens as torch_move, gpu_to_cpu, cpu_to_gpu
-from memmove.triton_op import permute_tokens as triton_move, get_mappings_from_exp_ids
+from memmove.triton_op import permute_tokens as triton_move
 from memmove.cpp_op import permute_tokens as cpp_move
 from memmove.cuda_op import permute_tokens as cuda_move
+
+from memmove.triton_op import (
+    get_mappings_from_exp_ids, 
+    get_mappings_from_exp_ids_cuda, 
+    get_mappings_from_exp_ids_py, 
+    get_mappings_from_exp_ids_numpy,
+)
 class Benchmark:
     
     def __init__(self, name, op, warmup_iter=5, run_iter=10):
@@ -38,10 +45,10 @@ class Benchmark:
         end = time.time()
         cuda_elapse = start_event.elapsed_time(end_event) / self.runs * 1000
         
-        data_size = results[0].element_size() * results[0].numel()
+        # data_size = results[0].element_size() * results[0].numel()
         
         elapse = (end - start) * (10 ** 6) / self.runs
-        print(f"benchmark {self.name} takes: {elapse:.1f} us, cuda elpase: {cuda_elapse:.1f} us, bw : {8 * data_size / elapse / (10 ** 3):.1f} gbps")
+        print(f"benchmark {self.name} takes: {elapse:.1f} us, cuda elpase: {cuda_elapse:.1f} us")
         
         return results[0]
         
@@ -60,6 +67,19 @@ def get_args():
     
     args = parser.parse_args()
     return args
+
+def mappings_perf(args):
+    mappingsop = Benchmark("mappings", get_mappings_from_exp_ids)
+    mappingsop_cuda = Benchmark("mappings_cuda", get_mappings_from_exp_ids_cuda)
+    mappingsop_py = Benchmark("mappings_py", get_mappings_from_exp_ids_py)
+    mappingsop_numpy = Benchmark("mappings_numpy", get_mappings_from_exp_ids_numpy)
+    
+    exp_ids = torch.randint(0, args.experts, (args.batch,), dtype=torch.int64, device="cuda:0")
+        
+    mappingsop(exp_ids, args.experts)
+    mappingsop_cuda(exp_ids, args.experts)
+    mappingsop_py(exp_ids, args.experts)
+    mappingsop_numpy(exp_ids, args.experts)
 
 @torch.inference_mode
 def main():
@@ -105,6 +125,8 @@ def main():
     
     D2H(gpu_tensor)
     H2D(cpu_tensor)
+    
+    mappings_perf(args)
         
     if args.memory_track:
         torch.cuda.memory._dump_snapshot("mem_snapshot.pickle")
