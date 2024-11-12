@@ -29,16 +29,25 @@ __global__ void permute_tokens_kernel(T *d_out, T *d_in, long *mappings, const i
 
     int block_base = chunk_id * CHUNK_SIZE;
 
-    // TODO: deal with fp16 and bf16
-    half2 *d_in_half2 = (half2 *)(d_in + token_id * hidden_size + block_base);
-    half2 *dest_half2 = (half2 *)(d_out + p * hidden_size + block_base);
+    using VEC = __half;
+    if constexpr (CHUNK_SIZE == 1024) {
+        using VEC = __half2;
+    } else if constexpr (CHUNK_SIZE == 2048) {
+        using VEC = float2;
+    } else {
+        using VEC = float4;
+    }
+    constexpr int VEC_SIZE = sizeof(VEC) / sizeof(T);
 
-    int task_per_warp = CHUNK_SIZE / num_warps / 2;
+    VEC *src_vec = (VEC *)(d_in + token_id * hidden_size + block_base);
+    VEC *dest_vec = (VEC *)(d_out + p * hidden_size + block_base);
+
+    int task_per_warp = CHUNK_SIZE / num_warps / VEC_SIZE;
     int warp_base = wid * task_per_warp;
 
     #pragma unroll
     for (int i = id_in_warp; i < task_per_warp; i += WARPSIZE) {
-        dest_half2[warp_base + i] = d_in_half2[warp_base + i];
+        dest_vec[warp_base + i] = src_vec[warp_base + i];
     }
 }
 
@@ -51,13 +60,13 @@ do { \
     
 template <class T>
 void _permute_tokens_cuda(T *dest, T *src, long *mappings, int num_tokens, int hidden_size) {
+    static_assert(sizeof(T) == 2);
     assert(hidden_size >= 2048 && hidden_size % 2048 == 0);
     constexpr int num_threads = 128;
     dim3 block(num_threads, 1, 1);
-
-    if (num_tokens <= 128) {
+    if (num_tokens <= 80) {
         LAUNCH_KERNEL_(512);
-    } else if (num_tokens <= 256) {
+    } else if (num_tokens <= 160) {
         LAUNCH_KERNEL_(1024);
     } else {
         LAUNCH_KERNEL_(2048);

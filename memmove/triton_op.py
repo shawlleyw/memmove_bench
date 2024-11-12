@@ -46,7 +46,27 @@ def _permute_tokens_kernel(
     
     tl.store(out_ptr + target_offsets, src_data)
 
-def get_mappings_from_exp_ids(exp_ids: torch.Tensor, num_experts: int):
+def permute_tokens(tokens: torch.Tensor, 
+                   mappings: torch.Tensor) -> torch.Tensor:
+    # permute tokens according to its expert id
+    assert len(tokens.shape) == 2 # [num_tokens, hidden_size]
+    num_tokens, hiddens_size = tokens.shape
+    assert(tokens.is_contiguous())
+    permuted_tokens = torch.empty((num_tokens, hiddens_size), device=tokens.device, dtype=tokens.dtype)
+    
+    # print(f"token mapping by expert id: {mappings}")
+    
+    grid = lambda META: (num_tokens, triton.cdiv(hiddens_size, META["BLOCK_SIZE"]))    
+    _permute_tokens_kernel[grid](
+        permuted_tokens, 
+        tokens, 
+        mappings.cuda(),
+        hiddens_size,
+        BLOCK_SIZE=1024
+    )
+    return permuted_tokens
+
+def get_mappings_from_exp_ids_torch(exp_ids: torch.Tensor, num_experts: int):
     assert len(exp_ids.shape) == 1 # [num_tokens]
     
     exp_ids = exp_ids.to("cpu")
@@ -128,23 +148,3 @@ def get_mappings_from_exp_ids_numpy(exp_ids: torch.Tensor, num_experts: int):
         mappings[i] = exp_cumsum[id]
         
     return torch.from_numpy(mappings), exp_cnt
-
-def permute_tokens(tokens: torch.Tensor, 
-                   mappings: torch.Tensor) -> torch.Tensor:
-    # permute tokens according to its expert id
-    assert len(tokens.shape) == 2 # [num_tokens, hidden_size]
-    num_tokens, hiddens_size = tokens.shape
-    assert(tokens.is_contiguous())
-    permuted_tokens = torch.empty((num_tokens, hiddens_size), device=tokens.device, dtype=tokens.dtype)
-    
-    # print(f"token mapping by expert id: {mappings}")
-    
-    grid = lambda META: (num_tokens, triton.cdiv(hiddens_size, META["BLOCK_SIZE"]))    
-    _permute_tokens_kernel[grid](
-        permuted_tokens, 
-        tokens, 
-        mappings.cuda(),
-        hiddens_size,
-        BLOCK_SIZE=1024
-    )
-    return permuted_tokens

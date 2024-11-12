@@ -7,7 +7,7 @@ from memmove.cpp_op import permute_tokens as cpp_move
 from memmove.cuda_op import permute_tokens as cuda_move
 
 from memmove.triton_op import (
-    get_mappings_from_exp_ids, 
+    get_mappings_from_exp_ids_torch, 
     get_mappings_from_exp_ids_cuda, 
     get_mappings_from_exp_ids_py, 
     get_mappings_from_exp_ids_numpy,
@@ -69,7 +69,8 @@ def get_args():
     return args
 
 def mappings_perf(args):
-    mappingsop = Benchmark("mappings", get_mappings_from_exp_ids)
+    print("Mappings Performance:")
+    mappingsop = Benchmark("mappings", get_mappings_from_exp_ids_torch)
     mappingsop_cuda = Benchmark("mappings_cuda", get_mappings_from_exp_ids_cuda)
     mappingsop_py = Benchmark("mappings_py", get_mappings_from_exp_ids_py)
     mappingsop_numpy = Benchmark("mappings_numpy", get_mappings_from_exp_ids_numpy)
@@ -83,7 +84,6 @@ def mappings_perf(args):
 
 @torch.inference_mode
 def main():
-    torch.random.manual_seed(42)
     args = get_args()
     
     if not args.experts:
@@ -92,7 +92,7 @@ def main():
     else:
         # generate expert id (bin index)
         exp_ids = torch.randint(0, args.experts, (args.batch,), dtype=torch.int64, device="cuda:0")
-        mappings, _ = get_mappings_from_exp_ids(exp_ids, args.experts)
+        mappings, _ = get_mappings_from_exp_ids_py(exp_ids, args.experts)
         
     if args.profile:
         profiler = torch.profiler.profile(
@@ -101,7 +101,7 @@ def main():
         )
         profiler.start()
     
-    inputs = torch.randn((args.batch, args.dim), dtype=torch.float16, device="cuda:0")
+    inputs = torch.randn((args.batch, args.dim), dtype=torch.bfloat16, device="cuda:0")
     print(f"Input shape: {inputs.shape}, dtype={inputs.dtype}")
     
     if args.memory_track:
