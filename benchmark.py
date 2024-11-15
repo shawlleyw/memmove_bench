@@ -88,10 +88,10 @@ def main():
     
     if not args.experts:
         # generate mappings
-        mappings = torch.randperm(args.batch, dtype=torch.int64, device="cuda:0")
+        mappings = torch.randperm(args.batch, dtype=torch.int32, device="cuda:0")
     else:
         # generate expert id (bin index)
-        exp_ids = torch.randint(0, args.experts, (args.batch,), dtype=torch.int64, device="cuda:0")
+        exp_ids = torch.randint(0, args.experts, (args.batch,), dtype=torch.int32, device="cuda:0")
         mappings, _ = get_mappings_from_exp_ids_py(exp_ids, args.experts)
         
     if args.profile:
@@ -113,13 +113,20 @@ def main():
     cppop = Benchmark("cpp", cpp_move)
     
     def get_torch_mappings():
-        mappings_list = mappings.tolist()
+        if torch.is_tensor(mappings):
+            mappings_list = mappings.tolist()
+        else:
+            mappings_list = mappings
+            
         torch_mappings = [0] * len(mappings_list)
         
         for i, id in enumerate(mappings_list):
             torch_mappings[id] = i
-        return torch.tensor(torch_mappings, dtype=mappings.dtype, device=mappings.device)
+        return torch.tensor(torch_mappings, dtype=torch.int32, device=inputs.device)
     
+    if torch.is_tensor(mappings):
+        assert mappings.dtype == torch.int32, f"mappings dtype is required to be int32, but found {mappings.dtype}"
+        
     # NOTE: the torch op is a reverse operation of the other three
     torch_res = torchop(inputs, get_torch_mappings())
     cuda_res = cudaop(inputs, mappings)

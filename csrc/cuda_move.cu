@@ -11,7 +11,7 @@
 #include "cuda_move.h"
 
 template <class T, int CHUNK_SIZE>
-__global__ void permute_tokens_kernel(T *d_out, T *d_in, long *mappings, const int hidden_size) {
+__global__ void permute_tokens_kernel(T *d_out, T *d_in, int *mappings, const int hidden_size) {
     constexpr int WARPSIZE = 32;
 
     int token_id = blockIdx.x;
@@ -59,7 +59,7 @@ do { \
 } while(0)
     
 template <class T>
-void _permute_tokens_cuda(T *dest, T *src, long *mappings, int num_tokens, int hidden_size) {
+void _permute_tokens_cuda(T *dest, T *src, int *mappings, int num_tokens, int hidden_size) {
     static_assert(sizeof(T) == 2);
     assert(hidden_size >= 2048 && hidden_size % 2048 == 0);
     constexpr int num_threads = 128;
@@ -84,7 +84,7 @@ torch::Tensor permute_tokens_cuda(torch::Tensor tokens, torch::Tensor mappings) 
     torch::Tensor out = torch::empty_like(tokens);
    
     AT_DISPATCH_REDUCED_FLOATING_TYPES(tokens.scalar_type(), "permute_tokens_cuda", [&] {
-        _permute_tokens_cuda<scalar_t>(out.data_ptr<scalar_t>(), tokens.data_ptr<scalar_t>(), mappings.data_ptr<long>(), num_tokens, hidden_size);
+        _permute_tokens_cuda<scalar_t>(out.data_ptr<scalar_t>(), tokens.data_ptr<scalar_t>(), mappings.data_ptr<int>(), num_tokens, hidden_size);
     });
 
     return out;

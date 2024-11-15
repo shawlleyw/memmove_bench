@@ -23,7 +23,7 @@ torch::Tensor permute_tokens_cpp(torch::Tensor tokens, torch::Tensor mappings) {
     const int elem_size = sizeof(tokens.dtype());
     const int token_size = elem_size * hiddens;
 
-    auto mappings_acc = mappings.accessor<long,1>();
+    auto mappings_acc = mappings.accessor<int,1>();
 
     #pragma omp parallel for
     for (int i = 0; i < batch; i++) {
