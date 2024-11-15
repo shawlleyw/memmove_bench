@@ -103,6 +103,7 @@ def main():
     
     inputs = torch.randn((args.batch, args.dim), dtype=torch.bfloat16, device="cuda:0")
     print(f"Input shape: {inputs.shape}, dtype={inputs.dtype}")
+    print(f"mappings {mappings}")
     
     if args.memory_track:
         torch.cuda.memory._record_memory_history()
@@ -126,7 +127,7 @@ def main():
     
     if torch.is_tensor(mappings):
         assert mappings.dtype == torch.int32, f"mappings dtype is required to be int32, but found {mappings.dtype}"
-        
+    
     # NOTE: the torch op is a reverse operation of the other three
     torch_res = torchop(inputs, get_torch_mappings())
     cuda_res = cudaop(inputs, mappings)

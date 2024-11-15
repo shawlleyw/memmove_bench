@@ -23,9 +23,6 @@ __global__ void permute_tokens_kernel(T *d_out, T *d_in, int *mappings, const in
     int wid = tid / WARPSIZE;
 
     int p = mappings[token_id];
-    if (p == token_id) {
-        return;
-    }
 
     int block_base = chunk_id * CHUNK_SIZE;
 
